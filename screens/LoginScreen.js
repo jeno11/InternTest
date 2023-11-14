@@ -3,10 +3,19 @@ import React, { useEffect, useState } from 'react'
 import { auth } from '../firebase'
 import { useNavigation } from '@react-navigation/native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
+import * as Yup from 'yup';
+
+const signUpSchema = Yup.object().shape({
+    email: Yup.string().email('Email is Invalid').required('Email Cannot Be Empty'),
+    password: Yup.string().min(8, 'Password Must have a Minimum of eight Characters').required('Password Cannot Be Empty'),
+});
 
 const LoginScreen = () => {
+    
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [success, setSuccess] = useState(false);
+    const [errors, setErrors] = useState({});
     const navigation = useNavigation()
 
     useEffect(() => {
@@ -18,15 +27,50 @@ const LoginScreen = () => {
         return unsubscribe 
     }, [])
 
-    const handleSignUp = () => {
-        auth
+    const handleSignUp = async () => {
+        try {
+          // Awaiting for Yup to validate text
+          await signUpSchema.validate({ email, password }, { abortEarly: false });
+          
+          auth
             .createUserWithEmailAndPassword(email, password)
             .then(userCredentials => {
                 const user = userCredentials.user;
                 console.log('Registered:', user.email);
             })
-            .catch(error => alert(error.message))
-    }
+            
+          // Reseting Warnings and displaying success message if all goes well
+          setErrors({});
+          setSuccess(true);
+        } catch (error) {
+          // Reseting Succes Message
+          setSuccess(false);
+    
+          // Setting error messages identified by Yup
+          if (error instanceof Yup.ValidationError) {
+            // Extracting Yup specific validation errors from list of total errors
+            const yupErrors = {};
+            error.inner.forEach((innerError) => {
+              yupErrors[innerError.path] = innerError.message;
+            });
+    
+            // Saving extracted errors
+            setErrors(yupErrors);
+          }
+        }
+        
+      };
+    
+
+    // const handleSignUp = () => {
+    //     auth
+    //         .createUserWithEmailAndPassword(email, password)
+    //         .then(userCredentials => {
+    //             const user = userCredentials.user;
+    //             console.log('Registered:', user.email);
+    //         })
+    //         .catch(error => alert(error.message))
+    // }
     
     const handleLogin = () => {
         auth
@@ -50,6 +94,10 @@ const LoginScreen = () => {
                 onChangeText={text => setEmail(text)}
                 style={styles.input}
             />
+            {errors.email && 
+            <Text style={styles.textWarning}>
+                {errors.email}
+            </Text>}
 
             <TextInput
                 placeholder="Password"
@@ -58,6 +106,10 @@ const LoginScreen = () => {
                 style={styles.input}
                 secureTextEntry
             />
+            {errors.password && 
+            <Text style={styles.textWarning}>
+                {errors.password}
+            </Text>}
         </View>
 
         <View style={styles.buttonContainer}>
